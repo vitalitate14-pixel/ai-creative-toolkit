@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Device-only edition: no client may access the retired cloud data store.
+    // Historical server data is preserved; administrative exports remain possible.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

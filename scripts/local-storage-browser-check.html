@@ -1,0 +1,61 @@
+<!doctype html><meta charset="utf-8"><title>本地存储回归检查</title>
+<h1>本地存储回归检查</h1><pre id="results">正在运行…</pre><button id="reload" hidden>刷新验证持久化</button>
+<script type="module">
+import * as store from '/services/localFirestore.ts';
+import * as projects from '/services/projectService.ts';
+import * as history from '/services/historyService.ts';
+import * as presets from '/services/presetSheetService.ts';
+const key='toolkit-local-regression-session', out=document.querySelector('#results');
+const assert=(condition,message)=>{if(!condition)throw new Error(message);};
+let results=[];const pass=message=>{results.push('通过：'+message);out.textContent=results.join('\n');};
+try {
+ const saved=JSON.parse(sessionStorage.getItem(key)||'null');
+ if(saved){
+  results=saved.results;
+  const project=await projects.getProject(saved.owner,'image-recognition',saved.projectId);
+  assert(project.currentState.images[0].base64Data.length===200000,'刷新后原图数据损坏');
+  assert(typeof project.createdAt.toMillis==='function','刷新后时间类型损坏');
+  assert((await projects.listVersions(saved.owner,'image-recognition',saved.projectId)).length===1,'版本丢失');
+  assert((await store.getDoc(store.doc(store.db,'users',saved.owner,'apiKeys','pool'))).data().keys[0].apiKey==='test-not-a-real-key','个人密钥丢失');
+  assert((await history.loadSession(saved.owner,'image-recognition',saved.sessionId)).data.base64Data.length===200000,'历史图片被截断');
+  assert((await presets.fetchUserPresetsFromSheet(saved.owner,{sheetId:'local',sheetName:saved.owner})).length===2,'本地预设跨工具保存丢失');
+  pass('刷新后恢复完整项目、图片、版本、历史、预设和个人密钥');
+  await projects.deleteProject(saved.owner,'image-recognition',saved.projectId);
+  await history.deleteSession(saved.owner,'image-recognition',saved.sessionId);
+  await store.deleteDoc(store.doc(store.db,'localPresetRows',encodeURIComponent(saved.owner+':'+saved.owner)));
+  await store.deleteDoc(store.doc(store.db,'users',saved.owner,'apiKeys','pool'));
+  const records=await store.getDocs(store.collection(store.db,'localStorageRegression',saved.owner,'items'));
+  for(const item of records.docs)await store.deleteDoc(item.ref);
+  sessionStorage.removeItem(key);
+  pass('仅清理本次测试数据，保留用户现有数据');
+  out.textContent=results.join('\n')+'\n全部检查通过';
+ }else{
+  const owner='test-'+crypto.randomUUID(), col=store.collection(store.db,'localStorageRegression',owner,'items');
+  const a=store.doc(col,'a'), b=store.doc(col,'b');
+  await store.setDoc(a,{group:'x',rank:2,nested:{keep:1},createdAt:store.serverTimestamp()});
+  await store.setDoc(a,{nested:{extra:2}},{merge:true});
+  let data=(await store.getDoc(a)).data();assert(data.nested.keep===1&&data.nested.extra===2&&typeof data.createdAt.toMillis==='function','合并或时间失败');pass('本地写入、合并和时间类型');
+  await store.setDoc(b,{group:'x',rank:1});
+  const found=await store.getDocs(store.query(col,store.where('group','==','x'),store.orderBy('rank','asc'),store.limit(1)));
+  assert(found.docs[0].id==='b','查询排序失败');pass('项目查询、排序和数量限制');
+  const batch=store.writeBatch(store.db);batch.set(store.doc(col,'rollback'),{value:1});batch.update(store.doc(col,'missing'),{value:2});
+  let failed=false;try{await batch.commit();}catch{failed=true;}
+  assert(failed&&!(await store.getDoc(store.doc(col,'rollback'))).exists(),'批量操作未原子回滚');pass('保存失败时批量操作完整回滚');
+  await new Promise((resolve,reject)=>{
+   let calls=0;const stop=store.onSnapshot(a,snap=>{calls++;if(calls===1)store.updateDoc(a,{rank:3}).catch(reject);else if(snap.data().rank===3){stop();resolve();}},reject);
+  });pass('本地变更订阅可更新并取消');
+  const base64='YWJj'.repeat(50000);
+  const projectId=await projects.createProject(owner,{moduleId:'image-recognition',name:'Local regression',state:{images:[{id:'image',base64Data:base64,mimeType:'image/png'}]}});
+  await projects.createVersion(owner,'image-recognition',projectId,{state:{images:[{base64Data:base64}]},label:'Original'});
+  await store.setDoc(store.doc(store.db,'users',owner,'apiKeys','pool'),{keys:[{apiKey:'test-not-a-real-key',nickname:'Test'}]});
+  const project=await projects.getProject(owner,'image-recognition',projectId);
+  assert(project.currentState.images[0].base64Data===base64,'大图片数据被截断');pass('不登录保存项目、版本和大图片原始数据');
+  const sessionId=await history.saveSession(owner,{moduleId:'image-recognition',title:'History regression',preview:'Test',itemCount:1,data:{base64Data:base64}});
+  await presets.savePresetRowsToSheet({userName:owner,config:{sheetId:'local',sheetName:owner},rows:[{category:'one',presetLabel:'One',prompt:'One'}]});
+  await presets.savePresetRowsToSheet({userName:owner,config:{sheetId:'local',sheetName:owner},rows:[{category:'two',presetLabel:'Two',prompt:'Two'}]});
+  pass('本地历史保留原图，预设保存不会覆盖其他工具分类');
+  sessionStorage.setItem(key,JSON.stringify({owner,projectId,sessionId,results}));
+  const button=document.querySelector('#reload');button.hidden=false;button.onclick=()=>location.reload();
+ }
+}catch(error){out.textContent+='\n失败：'+error.stack;}
+</script>

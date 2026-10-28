@@ -1,0 +1,634 @@
+/**
+ * Google Sheets 认证配置面板样式
+ */
+
+.sheets-auth-config {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.sheets-auth-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.sheets-auth-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.sheets-auth-header .close-btn {
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: #64748b;
+    border-radius: 4px;
+}
+
+.sheets-auth-header .close-btn:hover {
+    background: #f1f5f9;
+    color: #1e293b;
+}
+
+/* 消息提示 */
+.auth-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 14px;
+}
+
+.auth-message.error {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+
+.auth-message.success {
+    background: #f0fdf4;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+}
+
+/* 模式卡片 */
+.auth-modes {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.auth-mode-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.auth-mode-card:hover {
+    border-color: #94a3b8;
+    background: #f8fafc;
+}
+
+.auth-mode-card.active {
+    border-color: #6366f1;
+    background: #eef2ff;
+}
+
+.mode-icon {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f1f5f9;
+    border-radius: 10px;
+    color: #475569;
+}
+
+.auth-mode-card.active .mode-icon {
+    background: #6366f1;
+    color: white;
+}
+
+.mode-info {
+    flex: 1;
+}
+
+.mode-title {
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+.mode-desc {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.mode-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.mode-badge.readonly {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.mode-badge.readwrite {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.mode-badge.test {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+/* 配置详情区域 */
+.auth-config-detail {
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.config-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.config-title {
+    font-weight: 600;
+    color: #1e293b;
+    font-size: 15px;
+}
+
+.config-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    background: #eff6ff;
+    border-radius: 8px;
+    color: #1d4ed8;
+    font-size: 14px;
+}
+
+.config-info.warning {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.current-config {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: #dcfce7;
+    border-radius: 8px;
+    color: #16a34a;
+    font-size: 13px;
+}
+
+.upload-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: #6366f1;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.upload-btn:hover {
+    background: #4f46e5;
+}
+
+.config-help {
+    display: flex;
+    align-items: center;
+}
+
+.config-help a {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #6366f1;
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.config-help a:hover {
+    text-decoration: underline;
+}
+
+.config-note {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: #475569;
+}
+
+.config-note strong {
+    color: #1e293b;
+}
+
+.config-note ol,
+.config-note ul {
+    margin: 8px 0 0 0;
+    padding-left: 20px;
+}
+
+.config-note li {
+    margin: 6px 0;
+}
+
+.config-note code {
+    background: #f1f5f9;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #6366f1;
+}
+
+/* 表单样式 */
+.config-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.config-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.config-form label span {
+    font-size: 13px;
+    font-weight: 500;
+    color: #475569;
+}
+
+.config-form input {
+    padding: 10px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.config-form input:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.save-btn {
+    padding: 10px 20px;
+    background: #6366f1;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-top: 4px;
+}
+
+.save-btn:hover {
+    background: #4f46e5;
+}
+
+/* 写入功能说明 */
+.write-features-info {
+    background: #fefce8;
+    border: 1px solid #fef08a;
+    border-radius: 10px;
+    padding: 16px 20px;
+}
+
+.write-features-info .info-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: #854d0e;
+    margin-bottom: 12px;
+}
+
+.write-features-info ul {
+    margin: 0;
+    padding-left: 24px;
+    color: #713f12;
+    font-size: 14px;
+}
+
+.write-features-info li {
+    margin: 6px 0;
+}
+
+.write-features-info .info-note {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #fef08a;
+    font-size: 13px;
+    color: #854d0e;
+}
+
+/* 暗色模式支持 */
+@media (prefers-color-scheme: dark) {
+    .sheets-auth-config {
+        background: #1e293b;
+    }
+
+    .sheets-auth-header h3 {
+        color: #f1f5f9;
+    }
+
+    .auth-mode-card {
+        border-color: #334155;
+        background: #0f172a;
+    }
+
+    .auth-mode-card:hover {
+        border-color: #475569;
+        background: #1e293b;
+    }
+
+    .auth-mode-card.active {
+        border-color: #818cf8;
+        background: #312e81;
+    }
+
+    .mode-icon {
+        background: #334155;
+        color: #94a3b8;
+    }
+
+    .mode-title {
+        color: #f1f5f9;
+    }
+
+    .mode-desc {
+        color: #94a3b8;
+    }
+
+    .auth-config-detail {
+        background: #0f172a;
+    }
+
+    .config-title {
+        color: #f1f5f9;
+    }
+
+    .config-note {
+        background: #1e293b;
+        border-color: #334155;
+        color: #94a3b8;
+    }
+
+    .config-note strong {
+        color: #f1f5f9;
+    }
+
+    .config-form input {
+        background: #1e293b;
+        border-color: #475569;
+        color: #f1f5f9;
+    }
+}
+
+/* GAS 提示框 */
+.gas-tip {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+    border-radius: 8px;
+    border: 1px solid #c8e6c9;
+    font-size: 12px;
+    color: #2e7d32;
+}
+
+.gas-tip-header {
+    font-weight: 600;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.gas-tip-desc {
+    font-size: 11px;
+    color: #388e3c;
+}
+
+.gas-tip-link {
+    margin-top: 6px;
+    font-size: 10px;
+}
+
+.gas-tip-btn {
+    background: none;
+    border: none;
+    color: #1565c0;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+    font-size: 10px;
+}
+
+/* GAS 指南弹窗 */
+.gas-guide-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.gas-guide-modal {
+    background: #1e1e1e;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 700px;
+    max-height: 85vh;
+    overflow: auto;
+    padding: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    color: #e0e0e0;
+}
+
+.gas-guide-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #444;
+    padding-bottom: 12px;
+}
+
+.gas-guide-title {
+    margin: 0;
+    font-size: 18px;
+    color: #fff;
+}
+
+.gas-guide-close-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #aaa;
+}
+
+.gas-guide-close-btn:hover {
+    color: #fff;
+}
+
+.gas-guide-content {
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.gas-advantage-box {
+    background: rgba(76, 175, 80, 0.2);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.gas-advantage-label {
+    color: #81c784;
+}
+
+.gas-advantage-text {
+    color: #c8e6c9;
+}
+
+.gas-section-title {
+    margin: 16px 0 8px;
+    color: #64b5f6;
+}
+
+.gas-steps-list {
+    padding-left: 20px;
+    margin: 0;
+    color: #bbb;
+}
+
+.gas-code-highlight {
+    background: #333;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #ffd54f;
+}
+
+.gas-warning-text {
+    color: #ef5350;
+}
+
+.gas-copy-btn {
+    padding: 4px 12px;
+    background: #4caf50;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.gas-copy-btn:hover {
+    background: #43a047;
+}
+
+.gas-code-block {
+    background: #0d1117;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 10px;
+    overflow: auto;
+    max-height: 200px;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+}
+
+.gas-warning-box {
+    margin-top: 16px;
+    padding: 10px;
+    background: rgba(255, 152, 0, 0.1);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 152, 0, 0.3);
+    font-size: 11px;
+    color: #ffb74d;
+}
+
+.gas-guide-footer {
+    margin-top: 20px;
+    text-align: right;
+}
+
+.gas-close-btn {
+    padding: 8px 20px;
+    background: #1565c0;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.gas-close-btn:hover {
+    background: #1976d2;
+}
+
+/* GAS 侧边栏样式 (ProDedupApp) */
+.gas-sidebar-steps {
+    margin: 4px 0 0 16px;
+    padding: 0;
+    font-size: 10px;
+}
+
+.gas-url-input {
+    margin-bottom: 8px;
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid #444;
+    background: #222;
+    color: #fff;
+    font-size: 11px;
+}
+
+.gas-connect-btn {
+    width: 100%;
+    padding: 8px;
+    background: #4caf50;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.gas-connect-btn:hover {
+    background: #43a047;
+}
+
+.gas-connect-btn:disabled {
+    background: #666;
+    cursor: not-allowed;
+}

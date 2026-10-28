@@ -1,0 +1,41 @@
+name: Package AI Studio ZIP
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # Allow manual triggers on GitHub UI
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build and package reviewed AI Studio runtime
+        run: node scripts/package-aistudio.cjs
+        env:
+          LOCAL_DEV: 'true'
+          AISTUDIO_ZIP_OUTPUT: ai-toolkit-security-build.zip
+
+      - name: Upload AI Studio ZIP as Artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ai-toolkit-aistudio
+          path: ai-toolkit-security-build.zip
+          retention-days: 7
