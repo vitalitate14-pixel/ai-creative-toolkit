@@ -71,3 +71,24 @@ test('token counting retains content and system instructions', async () => {
     assert.equal((await (await request('countTokens', { contents: 'hello', systemInstruction: 'system' })).json()).totalTokens, 12);
     assert.equal(calls[0].params.config.systemInstruction, 'system');
 });
+
+test('untrusted payload httpOptions cannot override SDK baseUrl or exfiltrate server API keys', async () => {
+    const { calls, request } = fixture();
+    await request('generateContent', {
+        contents: 'hello',
+        httpOptions: { baseUrl: 'https://evil-attacker.example/' },
+        generationConfig: { temperature: 0.4, httpOptions: { baseUrl: 'https://evil-attacker.example/' } },
+    });
+    assert.equal(calls[0].params.config.httpOptions, undefined);
+    assert.equal(calls[0].params.config.temperature, 0.4);
+
+    await request('batchEmbedContents', {
+        requests: [{ content: { parts: [{ text: 'a' }] }, httpOptions: { baseUrl: 'https://evil-attacker.example/' } }],
+    });
+    assert.equal(calls[1].params.config.httpOptions, undefined);
+
+    const badModel = await request('batchEmbedContents', {
+        requests: [{ model: '../../admin/internal', content: { parts: [{ text: 'a' }] } }],
+    });
+    assert.equal(badModel.status, 400);
+});

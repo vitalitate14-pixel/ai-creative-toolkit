@@ -1,3 +1,14 @@
+const FORBIDDEN_SDK_CONFIG_KEYS = new Set(['httpOptions', 'abortSignal', '__proto__', 'constructor', 'prototype']);
+
+function sanitizeSdkConfig(obj) {
+    const clean = {};
+    if (!obj || typeof obj !== 'object') return clean;
+    for (const [k, v] of Object.entries(obj)) {
+        if (!FORBIDDEN_SDK_CONFIG_KEYS.has(k)) clean[k] = v;
+    }
+    return clean;
+}
+
 /** 全软件的 AI Studio SDK 适配：保留原有多模态/工具/结构化输出请求。 */
 function createSdkFetch({ GoogleGenAI, fallbackFetch = fetch } = {}) {
     const Client = GoogleGenAI || require('@google/genai').GoogleGenAI;
@@ -11,7 +22,7 @@ function createSdkFetch({ GoogleGenAI, fallbackFetch = fetch } = {}) {
         const key = headers.get('x-goog-api-key');
         try {
             const payload = JSON.parse(Buffer.from(init.body || '{}').toString());
-            const vertexai = url.hostname.endsWith('aiplatform.googleapis.com');
+            const vertexai = url.protocol === 'https:' && (url.hostname === 'aiplatform.googleapis.com' || /^[a-z0-9-]+-aiplatform\.googleapis\.com$/.test(url.hostname));
             const ai = new Client({
                 apiKey: key,
                 vertexai,
@@ -26,13 +37,19 @@ function createSdkFetch({ GoogleGenAI, fallbackFetch = fetch } = {}) {
             const model = match[3];
             const operation = match[4];
             if (operation === 'embedContent' || operation === 'batchEmbedContents') {
-                const requests = payload.requests;
-                const { content, requests: ignored, model: ignoredModel, ...options } = payload;
+                const requests = Array.isArray(payload.requests) ? payload.requests : null;
+                const { content, requests: ignored, model: ignoredModel, ...rawOptions } = payload || {};
+                const options = sanitizeSdkConfig(rawOptions);
                 const groups = new Map();
                 (requests || [{ content, ...options }]).forEach((request, index) => {
-                    const { content, model: requestedModel, ...config } = request;
-                    const groupKey = JSON.stringify([requestedModel || model, config]);
-                    if (!groups.has(groupKey)) groups.set(groupKey, { model: requestedModel || model, config, items: [] });
+                    const { content, model: requestedModel, ...rawConfig } = request || {};
+                    if (requestedModel !== undefined && requestedModel !== '' && (typeof requestedModel !== 'string' || !/^(?:models\/)?[a-zA-Z0-9._-]+$/.test(requestedModel))) {
+                        throw Object.assign(new Error('Invalid embedding model parameter'), { status: 400 });
+                    }
+                    const targetModel = requestedModel || model;
+                    const config = sanitizeSdkConfig(rawConfig);
+                    const groupKey = JSON.stringify([targetModel, config]);
+                    if (!groups.has(groupKey)) groups.set(groupKey, { model: targetModel, config, items: [] });
                     groups.get(groupKey).items.push({ content, index });
                 });
                 const embeddings = [];
@@ -46,8 +63,17 @@ function createSdkFetch({ GoogleGenAI, fallbackFetch = fetch } = {}) {
                 }));
                 return Response.json(requests ? { embeddings } : { embedding: embeddings[0] });
             }
-            const { contents, generationConfig, ...options } = payload.generateContentRequest || payload;
-            const params = { model, contents, config: { ...generationConfig, ...options, abortSignal: init.signal } };
+            const source = (payload && typeof payload.generateContentRequest === 'object' && payload.generateContentRequest) || payload || {};
+            const { contents, generationConfig, ...rawOptions } = source;
+            const params = {
+                model,
+                contents,
+                config: {
+                    ...sanitizeSdkConfig(generationConfig),
+                    ...sanitizeSdkConfig(rawOptions),
+                    abortSignal: init.signal,
+                },
+            };
             if (operation === 'countTokens') return Response.json(await ai.models.countTokens(params));
             if (operation === 'generateContent') return Response.json(await ai.models.generateContent(params));
             const iterator = (await ai.models.generateContentStream(params))[Symbol.asyncIterator]();
