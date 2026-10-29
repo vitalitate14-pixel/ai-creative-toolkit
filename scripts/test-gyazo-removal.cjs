@@ -8,13 +8,23 @@ const root = path.resolve(__dirname, '..');
 function source(file) { return fs.readFileSync(path.join(root, file), 'utf8'); }
 function load(file, globals = {}) {
     const module = { exports: {} };
+    const localRequire = (spec) => {
+        if (spec.startsWith('.')) {
+            const resolved = path.resolve(path.dirname(path.join(root, file)), spec);
+            const relTs = path.relative(root, resolved.endsWith('.ts') ? resolved : `${resolved}.ts`);
+            if (fs.existsSync(path.join(root, relTs))) return load(relTs, globals);
+        }
+        return require(spec);
+    };
     vm.runInNewContext(ts.transpileModule(source(file), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText,
-        { module, exports: module.exports, console, URL, Blob, File, atob, ...globals });
+        { module, exports: module.exports, require: localRequire, console, URL, Blob, File, atob, ...globals });
     return module.exports;
 }
 test('application and archived Apps Script sources cannot upload to Gyazo or read its credentials', () => {
     function scan(folder) {
-        for (const entry of fs.readdirSync(path.join(root, folder), { withFileTypes: true })) {
+        const fullFolder = path.join(root, folder);
+        if (!fs.existsSync(fullFolder)) return;
+        for (const entry of fs.readdirSync(fullFolder, { withFileTypes: true })) {
             if (['node_modules', 'dist', 'prebuilt-dist', 'dist-electron'].includes(entry.name)) continue;
             const file = path.join(folder, entry.name);
             if (entry.isDirectory()) scan(file);

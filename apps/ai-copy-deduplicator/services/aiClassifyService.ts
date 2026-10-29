@@ -1,3 +1,4 @@
+import { apiKeyStorageKey, desktopEnvironmentKey } from '@/utils/apiKeyStorage';
 /**
  * AI 语义分类服务
  *
@@ -66,8 +67,8 @@ function getAiInstance(): GoogleGenAI {
         return (window as any).__app_get_ai_instance();
     }
     // 回退：自行创建实例
-    const storedKey = typeof window !== 'undefined' ? localStorage.getItem('user_api_key') : null;
-    const rawKey = storedKey || (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_GEMINI_API_KEY : '') || '';
+    const storedKey = typeof window !== 'undefined' ? localStorage.getItem(apiKeyStorageKey('user_api_key')) : null;
+    const rawKey = storedKey || (typeof import.meta !== 'undefined' ? desktopEnvironmentKey((import.meta as any).env?.VITE_GEMINI_API_KEY) : '') || '';
     const cleanKey = rawKey.trim().replace(/[^\x20-\x7E]/g, '');
 
     // AI Studio 环境无需检查 key 即返回实例

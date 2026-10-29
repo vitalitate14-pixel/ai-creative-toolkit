@@ -50,6 +50,12 @@ const escapeHtmlAttribute = (text: string) => {
     .replace(/'/g, '&#39;');
 };
 
+const sanitizeCssColor = (color?: string) => {
+  if (!color) return '';
+  const trimmed = color.trim();
+  return /^[#a-zA-Z0-9(),.%\s-]+$/.test(trimmed) ? escapeHtmlAttribute(trimmed) : '';
+};
+
 export const buildGoogleSheetsHtml = (
   grid: GridData,
   options: {
@@ -97,7 +103,7 @@ export const buildGoogleSheetsHtml = (
     for (let c = 0; c < row.length; c++) {
       const cellValue = row[c] ?? '';
       const style = styles?.get(cellKey(r + rowOffset, c + colOffset));
-      const bgColor = style?.bgColor;
+      const bgColor = sanitizeCssColor(style?.bgColor);
       const styleAttr = bgColor ? ` style="background-color:${bgColor};"` : '';
       const bgAttr = bgColor ? ` bgcolor="${bgColor}"` : '';
       const isFormula = cellValue.startsWith('=');
@@ -126,7 +132,7 @@ export const buildMergedCellsHtml = (
     bgColor?: string;
   } = {}
 ): string => {
-  const { bgColor } = options;
+  const safeBgColor = sanitizeCssColor(options.bgColor);
 
   let html = `<meta charset="utf-8"><google-sheets-html-origin><style type="text/css">
     table { border-collapse: collapse; }
@@ -142,8 +148,8 @@ export const buildMergedCellsHtml = (
     html += '<tr>';
     for (let c = 0; c < row.length; c++) {
       const cellValue = row[c] ?? '';
-      const styleAttr = bgColor ? ` style="background-color:${bgColor};"` : '';
-      const bgAttr = bgColor ? ` bgcolor="${bgColor}"` : '';
+      const styleAttr = safeBgColor ? ` style="background-color:${safeBgColor};"` : '';
+      const bgAttr = safeBgColor ? ` bgcolor="${safeBgColor}"` : '';
       const colspanAttr = span > 1 ? ` colspan="${span}"` : '';
       const dataValue = cellValue
         ? ` data-sheets-value="${escapeHtmlAttribute(JSON.stringify({ 1: 2, 2: cellValue }))}"`

@@ -1,14 +1,17 @@
 import { isRunningInAiStudio } from './aiStudioDetect';
 import { GoogleGenAI as GeminiSDK, type GoogleGenAIOptions } from '@google/genai';
 import { normalizeGeminiModel, normalizeGeminiParams } from './geminiModels';
+import { apiKeyStorageKey } from './apiKeyStorage';
+import { getAiStudioClientOptions, isAiStudioPlatformKey, resolveAiStudioKey, aiStudioApiBase, ensureAiStudioRuntime } from './aiStudioTransport';
 
 export const STUDIO_KEY_PLACEHOLDER = 'AISTUDIO_NATIVE_MODE_PLACEHOLDER';
 export const STUDIO_BRIDGE_KEY = 'GEMINI_API_KEY';
 declare const __GOOGLE_API_PROVIDER__: string;
 
 export function getGoogleApiProvider(): 'gemini' | 'vertex' {
-    const saved = typeof window !== 'undefined' ? window.localStorage?.getItem('google_api_provider') : null;
+    const saved = typeof window !== 'undefined' ? window.localStorage?.getItem(apiKeyStorageKey('google_api_provider')) : null;
     if (saved === 'vertex' || saved === 'gemini') return saved;
+    if (isRunningInAiStudio()) return 'gemini';
     return typeof __GOOGLE_API_PROVIDER__ !== 'undefined' && __GOOGLE_API_PROVIDER__ === 'vertex' ? 'vertex' : 'gemini';
 }
 
@@ -18,9 +21,9 @@ export function getGoogleApiProvider(): 'gemini' | 'vertex' {
  */
 export function getVertexScope(): { project: string; location: string } | null {
     if (typeof window === 'undefined') return null;
-    const project = (window.localStorage?.getItem('vertex_project') || '').trim();
+    const project = (window.localStorage?.getItem(apiKeyStorageKey('vertex_project')) || '').trim();
     if (!project || !/^[a-z0-9][a-z0-9-]{0,62}$/i.test(project)) return null;
-    const location = (window.localStorage?.getItem('vertex_location') || 'global').trim().toLowerCase();
+    const location = (window.localStorage?.getItem(apiKeyStorageKey('vertex_location')) || 'global').trim().toLowerCase();
     return { project, location: /^[a-z0-9-]{1,40}$/.test(location) ? location : 'global' };
 }
 
@@ -41,7 +44,7 @@ export function vertexHost(scope = getVertexScope()): string {
 
 /** These strings identify platform placeholders, never Google credentials. */
 function isStudioPlaceholder(key?: string): boolean {
-    return !key || key === STUDIO_KEY_PLACEHOLDER || key === STUDIO_BRIDGE_KEY;
+    return isAiStudioPlatformKey(key);
 }
 
 function isHtmlResponseError(error: any): boolean {
@@ -86,7 +89,7 @@ export async function* runGeminiStream<T>(operation: () => Promise<AsyncIterable
 /** Shared by SDK calls and the REST callers in mind map and other tools. */
 export function createGeminiFetch(
     originalFetch: typeof fetch,
-    options: { nativeMode: () => boolean; origin: string; basePath: string; provider?: 'gemini' | 'vertex'; vertexScope?: { project: string; location: string } | null }
+    options: { nativeMode: () => boolean; studioMode?: () => boolean; origin: string; basePath: string; provider?: 'gemini' | 'vertex'; vertexScope?: { project: string; location: string } | null }
 ): typeof fetch {
     return async (input, init) => {
         const url = new URL(input instanceof Request ? input.url : String(input), options.origin);
@@ -96,9 +99,7 @@ export function createGeminiFetch(
         const request = new Request(input, init);
         const headers = new Headers(request.headers);
         const key = headers.get('x-goog-api-key') || url.searchParams.get('key') || '';
-        // All native keys (including pool rotation) must use the same transport.
-        // Build apps use the Node runtime secret, including when Google's
-        // legacy iframe shim is present. Never switch to its private RPC proxy.
+        // 桌面代理与 AI Studio 平台入口分开；不自行调用平台的私有 RPC。
         const useServer = options.nativeMode();
         let body: BodyInit | undefined;
         if (request.method !== 'GET' && request.method !== 'HEAD') {
@@ -120,6 +121,16 @@ export function createGeminiFetch(
         }
 
         if (key === 'SERVER_SHARED_POOL') throw new Error('共享 AI 已移除，请填写个人 API Key');
+
+        if (options.studioMode?.()) {
+            const vertex = !isAiStudioPlatformKey(key) && options.provider === 'vertex';
+            await ensureAiStudioRuntime(key, vertex ? 'vertex' : 'gemini');
+            url.searchParams.delete('key');
+            headers.set('x-goog-api-key', resolveAiStudioKey(key));
+            const apiPath = vertex ? vertexScopedPath(url.pathname.replace(/^\/v1beta\//, '/v1/').replace('/models/', '/publishers/google/models/'), options.vertexScope ?? null) : url.pathname;
+            const target = new URL(aiStudioApiBase(vertex ? 'vertex' : 'gemini') + apiPath + url.search);
+            return originalFetch(target, { method: request.method, headers, body, signal: request.signal, credentials: 'same-origin' });
+        }
 
         if (useServer) {
             url.searchParams.delete('key');
@@ -162,8 +173,9 @@ export function createGeminiFetch(
 function browserTransportContext() {
     const provider = getGoogleApiProvider();
     return {
-        // AI Studio 总是走同源服务端；选择 Vertex 时，桌面版与本地开发（localhost 上有同源 /api/vertex 代理）也走服务端。
-        nativeMode: () => isRunningInAiStudio() || (provider === 'vertex' && hasLocalGoogleApiServer()),
+        // 只有桌面/本地 Vertex 使用同源代理。AI Studio 由独立适配器处理。
+        nativeMode: () => !isRunningInAiStudio() && provider === 'vertex' && hasLocalGoogleApiServer(),
+        studioMode: () => isRunningInAiStudio(),
         origin: window.location.origin,
         basePath: new URL('.', window.location.href).pathname,
         provider,
@@ -180,6 +192,7 @@ export function getGeminiClientOptions(
     options: GoogleGenAIOptions,
     context = typeof window !== 'undefined' ? browserTransportContext() : undefined
 ): GoogleGenAIOptions {
+    if (context?.studioMode?.()) return getAiStudioClientOptions(options, context.provider || 'gemini', context.vertexScope);
     if (!context?.nativeMode()) {
         // 普通网页版选择 Vertex：浏览器直接使用 Vertex AI Express（API Key 模式）。
         if (context?.provider === 'vertex' && !isStudioPlaceholder(options.apiKey)) {
@@ -226,8 +239,8 @@ function vertexRetryScope(error: any): { project: string; location: string } | n
 
 function rememberVertexScope(scope: { project: string; location: string }) {
     try {
-        window.localStorage.setItem('vertex_project', scope.project);
-        window.localStorage.setItem('vertex_location', scope.location);
+        window.localStorage.setItem(apiKeyStorageKey('vertex_project'), scope.project);
+        window.localStorage.setItem(apiKeyStorageKey('vertex_location'), scope.location);
         console.info(`[Vertex] 已自动切换到 global 区域（项目 ${scope.project}）`);
     } catch { /* storage unavailable: retry still succeeded for this call */ }
 }
@@ -242,15 +255,25 @@ export class GoogleGenAI extends GeminiSDK {
         for (const method of ['generateContent', 'generateContentStream'] as const) {
             const original = this.models[method].bind(this.models);
             (this.models as any)[method] = async (params: any) => {
+                if (isRunningInAiStudio()) await ensureAiStudioRuntime(options.apiKey, getGoogleApiProvider());
                 params = normalizeGeminiParams(params);
                 const operation = () => original(params);
                 if (method === 'generateContentStream') {
                     const native = isRunningInAiStudio();
+                    const completeResponse = () => this.models.generateContent(params);
                     return (async function* () {
                         let received = false;
                         try {
                             for await (const chunk of runGeminiStream(operation as () => Promise<AsyncIterable<any>>, native)) { received = true; yield chunk; }
                         } catch (error) {
+                            // 部分 AI Studio 网关返回普通 JSON，或缺少 SSE 末尾分隔符。
+                            // 仅在一个片段也未交给界面时回退；不重放已经显示的内容。
+                            const status = Number((error as any)?.status ?? (error as any)?.code);
+                            if (native && !received && ![400, 401, 403, 404, 429].includes(status)
+                                && /Incomplete JSON segment at the end/i.test(String((error as any)?.message || error))) {
+                                yield await completeResponse();
+                                return;
+                            }
                             const scope = received ? null : vertexRetryScope(error);
                             if (!scope) throw explainVertexModelError(error);
                             let retried = false;

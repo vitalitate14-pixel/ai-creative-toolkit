@@ -1,3 +1,4 @@
+import { apiKeyStorageKey, desktopEnvironmentKey } from '@/utils/apiKeyStorage';
 /**
  * Opal 画布工作流解析服务 v6.0
  * 
@@ -43,8 +44,8 @@ const getAiInstance = (): GoogleGenAI => {
     }
 
     // 回退：自行创建实例
-    const storedKey = typeof window !== 'undefined' ? localStorage.getItem('user_api_key') : null;
-    const rawKey = storedKey || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+    const storedKey = typeof window !== 'undefined' ? localStorage.getItem(apiKeyStorageKey('user_api_key')) : null;
+    const rawKey = storedKey || desktopEnvironmentKey((import.meta as any).env?.VITE_GEMINI_API_KEY) || '';
     const cleanKey = rawKey.trim().replace(/[^\x20-\x7E]/g, '');
 
     // AI Studio 环境：平台内部处理认证

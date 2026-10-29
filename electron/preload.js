@@ -104,43 +104,4 @@ contextBridge.exposeInMainWorld('electronInfo', {
     version: process.versions.electron,
     isElectron: true
 });
-
-// ==================== Opal 批量生图 API ====================
-contextBridge.exposeInMainWorld('opalAPI', {
-    // 打开登录窗口
-    openLogin: (profileName) => ipcRenderer.invoke('opal:open-login', { profileName }),
-
-    // 关闭登录窗口
-    closeLogin: (profileName) => ipcRenderer.invoke('opal:close-login', { profileName }),
-
-    // 检查登录状态
-    checkLogin: (profileName, opalUrl) => ipcRenderer.invoke('opal:check-login', { profileName, opalUrl }),
-
-    // 批量执行任务
-    runBatch: (config) => ipcRenderer.invoke('opal:run-batch', config),
-
-    // 停止任务
-    stop: (profileName) => ipcRenderer.invoke('opal:stop', { profileName }),
-
-    // 列出已保存的配置
-    listProfiles: () => ipcRenderer.invoke('opal:list-profiles'),
-
-    // 打开输出文件夹
-    openOutput: () => ipcRenderer.invoke('opal:open-output'),
-
-    // 监听日志
-    onLog: (callback) => {
-        ipcRenderer.on('opal:log', (event, log) => callback(log));
-        return () => ipcRenderer.removeAllListeners('opal:log');
-    },
-
-    // 监听进度
-    onProgress: (callback) => {
-        ipcRenderer.on('opal:progress', (event, progress) => callback(progress));
-        return () => ipcRenderer.removeAllListeners('opal:progress');
-    },
-
-    // 是否支持 Opal（仅 Electron 环境）
-    isAvailable: true
-});
 }

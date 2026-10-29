@@ -6,13 +6,16 @@ import type { Plugin } from 'vite';
 import { createRequire } from 'node:module';
 
 const { createGeminiHandler } = createRequire(import.meta.url)('./runtime/aistudio-server.cjs');
+const { createAiStudioHandler } = createRequire(import.meta.url)('./runtime/ai-studio-server.cjs');
 const { safePublicFetch, isSameOriginRequest } = createRequire(import.meta.url)('./runtime/safe-fetch.cjs');
 
 function geminiServerPlugin(env: Record<string, string>): Plugin {
   const install = (server: any) => {
     const handle = createGeminiHandler({ getKey: () => env.GEMINI_API_KEY || env.GOOGLE_API_KEY || '' });
+    const studioHandle = createAiStudioHandler({ getKey: () => env.GEMINI_API_KEY || env.GOOGLE_API_KEY || '' });
     server.middlewares.use((req: any, res: any, next: any) => {
-      handle(req, res).then((handled: boolean) => { if (!handled) next(); }).catch(next);
+      const route = req.url?.includes('/api/aistudio/') ? studioHandle : handle;
+      route(req, res).then((handled: boolean) => { if (!handled) next(); }).catch(next);
     });
   };
   return { name: 'gemini-server', configureServer: install, configurePreviewServer: install };
@@ -311,7 +314,6 @@ function imageProxyPlugin(): Plugin {
           const responseHeaders: Record<string, string> = {
             'Content-Type': contentType,
             'Cache-Control': 'public, max-age=86400',
-            'Access-Control-Allow-Origin': '*',
             'Access-Control-Expose-Headers': 'Content-Disposition, Content-Type, Content-Length, Accept-Ranges',
           };
           if (contentLength) responseHeaders['Content-Length'] = contentLength;

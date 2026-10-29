@@ -1,3 +1,4 @@
+import { apiKeyStorageKey, desktopEnvironmentKey } from '@/utils/apiKeyStorage';
 // API 生图 - Gemini 服务
 
 import { Modality } from '@google/genai';
@@ -25,10 +26,10 @@ const getAiInstance = (): GoogleGenAI => {
         }
     }
     if (!apiKey) {
-        apiKey = typeof window !== 'undefined' ? (localStorage.getItem('user_api_key') || '') : '';
+        apiKey = typeof window !== 'undefined' ? (localStorage.getItem(apiKeyStorageKey('user_api_key')) || '') : '';
     }
     if (!apiKey) {
-        apiKey = (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_GEMINI_API_KEY : '') || '';
+        apiKey = (typeof import.meta !== 'undefined' ? desktopEnvironmentKey((import.meta as any).env?.VITE_GEMINI_API_KEY) : '') || '';
     }
 
     const cleanKey = apiKey.trim().replace(/[^\x20-\x7E]/g, '');
@@ -61,8 +62,8 @@ const isAiStudioMode = (): boolean => {
     if (usePool && apiPool?.hasKeys?.()) {
         try { apiKey = apiPool.getCurrentKey(); } catch {}
     }
-    if (!apiKey) apiKey = typeof window !== 'undefined' ? (localStorage.getItem('user_api_key') || '') : '';
-    if (!apiKey) apiKey = (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_GEMINI_API_KEY : '') || '';
+    if (!apiKey) apiKey = typeof window !== 'undefined' ? (localStorage.getItem(apiKeyStorageKey('user_api_key')) || '') : '';
+    if (!apiKey) apiKey = (typeof import.meta !== 'undefined' ? desktopEnvironmentKey((import.meta as any).env?.VITE_GEMINI_API_KEY) : '') || '';
     return shouldUseAiStudioMode(apiKey.trim());
 };
 

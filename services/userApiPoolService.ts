@@ -1,3 +1,4 @@
+import { apiKeyPoolDocument } from '@/utils/apiKeyStorage';
 /**
  * User API Pool Firebase Service
  * 用户个人 API 池的 Firebase 同步
@@ -18,7 +19,7 @@ export interface UserApiKeyEntry {
  */
 export async function loadUserApiPool(userId: string): Promise<UserApiKeyEntry[]> {
     try {
-        const docRef = doc(db, 'users', userId, 'apiKeys', 'pool');
+        const docRef = doc(db, 'users', userId, 'apiKeys', apiKeyPoolDocument());
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
@@ -38,7 +39,7 @@ export async function loadUserApiPool(userId: string): Promise<UserApiKeyEntry[]
  */
 export async function saveUserApiPool(userId: string, keys: UserApiKeyEntry[]): Promise<void> {
     try {
-        const docRef = doc(db, 'users', userId, 'apiKeys', 'pool');
+        const docRef = doc(db, 'users', userId, 'apiKeys', apiKeyPoolDocument());
         await setDoc(docRef, {
             keys,
             updatedAt: serverTimestamp()
@@ -57,7 +58,7 @@ export function subscribeToUserApiPool(
     userId: string,
     callback: (keys: UserApiKeyEntry[]) => void
 ): () => void {
-    const docRef = doc(db, 'users', userId, 'apiKeys', 'pool');
+    const docRef = doc(db, 'users', userId, 'apiKeys', apiKeyPoolDocument());
 
     return onSnapshot(docRef, (docSnap) => {
         if (docSnap.exists()) {

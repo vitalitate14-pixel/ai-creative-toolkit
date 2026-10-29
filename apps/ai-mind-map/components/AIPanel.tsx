@@ -1,3 +1,4 @@
+import { desktopEnvironmentKey } from '@/utils/apiKeyStorage';
 /**
  * ✨ AI 助手面板 - 简化版
  * 重新设计的 UI，更简洁易用
@@ -77,7 +78,7 @@ export const AIPanel: React.FC = () => {
     const [showPresetSelector, setShowPresetSelector] = useState(false);
 
     const selectedNode = currentMap?.nodes[selectedNodeId || ''];
-    const envApiKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) as string | undefined;
+    const envApiKey = (typeof import.meta !== 'undefined' && desktopEnvironmentKey(import.meta.env?.VITE_GEMINI_API_KEY)) as string | undefined;
     const storedApiKey = getStoredApiKey();
     const apiKey = geminiApiKey || envApiKey || storedApiKey;
     const hasApiKey = hasAiAccess(apiKey);

@@ -1,3 +1,4 @@
+import { apiKeyStorageKey } from '@/utils/apiKeyStorage';
 export const getMainAiInstance = (): (() => any) | null => {
     if (typeof window === 'undefined') return null;
     const fn = (window as any).__mindMapGetAiInstance || (window as any).__app_get_ai_instance;
@@ -6,7 +7,7 @@ export const getMainAiInstance = (): (() => any) | null => {
 
 export const getStoredApiKey = (): string => {
     if (typeof window === 'undefined') return '';
-    return localStorage.getItem('user_api_key') || '';
+    return localStorage.getItem(apiKeyStorageKey('user_api_key')) || '';
 };
 
 export const hasAiAccess = (apiKey?: string): boolean => {

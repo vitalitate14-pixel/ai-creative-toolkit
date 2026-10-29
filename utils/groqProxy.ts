@@ -1,3 +1,4 @@
+import { apiKeyStorageKey } from '@/utils/apiKeyStorage';
 /**
  * Groq 全局代理 — 让所有模块透明使用 Groq
  * 
@@ -15,7 +16,7 @@
  */
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_KEYS_STORAGE_KEYS = ['smart_translate_groq_keys', 'groqKeys'];
+const GROQ_KEYS_STORAGE_KEYS = [apiKeyStorageKey('smart_translate_groq_keys'), apiKeyStorageKey('groqKeys')];
 
 // ─── 工具函数 ────────────────────────────────────────────
 

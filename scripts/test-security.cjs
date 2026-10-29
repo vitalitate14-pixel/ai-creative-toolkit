@@ -141,3 +141,29 @@ test('migrated PDF.js and Mammoth parse real PDF and DOCX files through Document
     assert.equal(docxResult.success, true, docxResult.error);
     assert.match(docxResult.text, /Security audit DOCX import/);
 });
+
+test('Service Account credentials reject non-Google token_uri endpoints', () => {
+    const sheetsAuth = loadTypeScript('services/sheetsAuthService.ts', { '../utils/publicApiConfig': {} });
+    assert.equal(sheetsAuth.validateServiceAccountCredentials({
+        type: 'service_account',
+        private_key: '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n',
+        client_email: 'bot@example.iam.gserviceaccount.com',
+        token_uri: 'https://oauth2.googleapis.com/token'
+    }), true);
+    assert.equal(sheetsAuth.validateServiceAccountCredentials({
+        type: 'service_account',
+        private_key: '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n',
+        client_email: 'bot@example.iam.gserviceaccount.com',
+        token_uri: 'https://attacker.example/token'
+    }), false);
+});
+
+test('clipboard HTML builders reject attribute breakout in bgColor', () => {
+    const types = loadTypeScript('apps/template-batch-editor/types.ts');
+    const clipboard = loadTypeScript('apps/template-batch-editor/utils/clipboard.ts', { '../types': types });
+    const styles = new Map([['0-0', { bgColor: 'red" onmouseover="window.__xss=1' }]]);
+    const html = clipboard.buildGoogleSheetsHtml([['cell']], { styles });
+    assert.doesNotMatch(html, /onmouseover/);
+    const mergedHtml = clipboard.buildMergedCellsHtml([['cell']], 2, { bgColor: 'red; background:url(javascript:1)' });
+    assert.doesNotMatch(mergedHtml, /javascript:/);
+});

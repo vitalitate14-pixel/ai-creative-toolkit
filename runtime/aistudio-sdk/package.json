@@ -1,0 +1,8 @@
+{
+  "name": "ai-toolkit-aistudio-sdk",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "@google/genai": "2.4.0"
+  }
+}

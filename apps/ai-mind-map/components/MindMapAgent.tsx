@@ -1,3 +1,4 @@
+import { desktopEnvironmentKey } from '@/utils/apiKeyStorage';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useMindMapStore } from '../store/mindMapStore';
 import { GeminiService, GEMINI_MODELS, type GeminiModelId } from '../services/geminiService';
@@ -54,7 +55,7 @@ export const MindMapAgent: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     const [selectedModel, setSelectedModel] = useState<GeminiModelId>('gemini-2.5-flash');
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
-    const envApiKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) as string | undefined;
+    const envApiKey = (typeof import.meta !== 'undefined' && desktopEnvironmentKey(import.meta.env?.VITE_GEMINI_API_KEY)) as string | undefined;
     const storedApiKey = getStoredApiKey();
     const apiKey = geminiApiKey || envApiKey || storedApiKey;
     const hasApiKey = hasAiAccess(apiKey);

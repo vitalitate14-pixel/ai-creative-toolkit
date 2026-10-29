@@ -14,7 +14,21 @@ const modelSource = fs.readFileSync(require('node:path').join(__dirname, '../uti
 new Function('module', 'exports', ts.transpileModule(modelSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText)(modelModule, modelModule.exports);
 function loadTransport(windowContext, nativeMode = false) {
     const compiled = { exports: {} };
-    const load = name => name === './geminiModels' ? modelModule.exports : require(name);
+    const cache = {};
+    const load = name => {
+        if (name === './geminiModels') return modelModule.exports;
+        if (name === './aiStudioDetect') return { isRunningInAiStudio: () => nativeMode };
+        if (['./apiKeyStorage', './aiStudioTransport'].includes(name)) {
+            if (!cache[name]) {
+                const module = { exports: {} }; cache[name] = module.exports;
+                const text = fs.readFileSync(require('node:path').join(__dirname, '../utils', name + '.ts'), 'utf8');
+                const js = ts.transpileModule(text, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
+                new Function('module', 'exports', 'require', 'window', js)(module, module.exports, load, windowContext);
+            }
+            return cache[name];
+        }
+        return require(name);
+    };
     new Function('module', 'exports', 'require', 'window', 'nativeMode', code)(compiled, compiled.exports, load, windowContext, nativeMode);
     return compiled.exports;
 }
@@ -94,7 +108,7 @@ test('streams and error responses remain untouched; old deployments give actiona
     assert.equal(outside.calls.length, 0);
 });
 
-async function handle({ url, method = 'POST', headers = {}, body = '{}', key = 'server-secret', upstream } = {}) {
+async function handle({ url, method = 'POST', headers = {}, body = '{}', key = 'server-secret', upstream, studio = false } = {}) {
     const req = Readable.from([Buffer.from(body)]);
     Object.assign(req, { url, method, headers: { host: 'preview.example', ...headers } });
     const chunks = [];
@@ -103,7 +117,8 @@ async function handle({ url, method = 'POST', headers = {}, body = '{}', key = '
     res.setHeader = (k, v) => { res.headers[k.toLowerCase()] = v; };
     res.writeHead = (status, values = {}) => { res.status = status; res.headersSent = true; Object.entries(values).forEach(([k, v]) => res.setHeader(k, v)); };
     const calls = [];
-    const handled = await createGeminiHandler({ getKey: () => key, upstreamFetch: async (...args) => { calls.push(args); return upstream || new Response('data: {"text":"ok"}\n\n', { headers: { 'content-type': 'text/event-stream' } }); } })(req, res);
+    const factory = studio ? require('../runtime/ai-studio-server.cjs').createAiStudioHandler : createGeminiHandler;
+    const handled = await factory({ getKey: () => key, upstreamFetch: async (...args) => { calls.push(args); return upstream || new Response('data: {"text":"ok"}\n\n', { headers: { 'content-type': 'text/event-stream' } }); } })(req, res);
     return { handled, res, calls, text: Buffer.concat(chunks).toString() };
 }
 
@@ -116,6 +131,26 @@ test('server injects only runtime secret, keeps SSE and strips browser query key
     assert.equal(result.calls[0][1].headers['x-goog-api-key'], 'server-secret');
     assert.equal(result.text, 'data: {"text":"ok"}\n\n');
     assert.equal(result.text.includes('server-secret'), false);
+});
+
+test('AI Studio has a distinct protocol and resolves platform and personal credentials server-side', async () => {
+    const url = '/api/aistudio/gemini/v1beta/models/gemini:generateContent';
+    const automatic = await handle({ url, studio: true, headers: { 'x-goog-api-key': 'AI_STUDIO_SERVER_AUTH' } });
+    assert.equal(automatic.calls[0][1].headers['x-goog-api-key'], 'server-secret');
+    const personal = await handle({ url, studio: true, key: '', headers: { 'x-goog-api-key': 'personal-test-key' } });
+    assert.equal(personal.calls[0][1].headers['x-goog-api-key'], 'personal-test-key');
+    const status = await handle({ url: '/api/aistudio/gemini/status', studio: true, method: 'GET' });
+    assert.deepEqual(JSON.parse(status.text), { runtime: 'ai-studio', protocol: 2, configured: true, transport: 'server' });
+    assert.doesNotMatch(status.text, /server-secret/);
+    assert.equal((await handle({ url: '/api/gemini/status', studio: true, method: 'GET' })).handled, false);
+});
+
+test('AI Studio handles same-origin reverse proxies but rejects forged or cross-site forwarded origins', async () => {
+    const base = { url: '/api/aistudio/gemini/status', studio: true, method: 'GET' };
+    const proxy = { host: 'internal:3000', origin: 'https://preview.example', 'x-forwarded-host': 'preview.example' };
+    assert.equal((await handle({ ...base, headers: { ...proxy, 'sec-fetch-site': 'same-origin' } })).res.status, 200);
+    assert.equal((await handle({ ...base, headers: proxy })).res.status, 403);
+    assert.equal((await handle({ ...base, headers: { ...proxy, 'sec-fetch-site': 'cross-site' } })).res.status, 403);
 });
 
 test('server preserves Google 400 and 429 errors, without retrying', async () => {
@@ -147,14 +182,13 @@ test('status reports configuration without revealing credentials; non-API routes
     assert.equal((await handle({ url: '/index.html', method: 'GET' })).handled, false);
 });
 
-test('real Google SDK uses the same HTTP server for text, SSE, images and embeddings', async () => {
+test('explicit backend SDK integration handles text, SSE, images and embeddings', async () => {
     const calls = [];
     const server = createStudioServer({ getKey: () => 'runtime-test-secret', upstreamFetch: async (url, init) => {
         assert.equal(init.headers['x-goog-api-key'], 'runtime-test-secret');
         assert.equal(url.searchParams.has('key'), false);
         const body = JSON.parse(init.body.toString());
         calls.push({ path: url.pathname, body });
-        if (calls.length === 1) return new Response('<!doctype html><html>Temporary gateway page</html>', { headers: { 'content-type': 'text/html' } });
         if (url.pathname.endsWith(':embedContent')) return Response.json({ embedding: { values: [0.1, 0.2] } });
         if (url.pathname.endsWith(':batchEmbedContents')) return Response.json({ embeddings: [{ values: [0.1, 0.2] }] });
         const result = { candidates: [{ content: { role: 'model', parts: url.pathname.includes('image')
@@ -170,8 +204,8 @@ test('real Google SDK uses the same HTTP server for text, SSE, images and embedd
         const origin = `http://127.0.0.1:${server.address().port}`;
         const windowContext = { location: { origin, href: origin + '/' } };
         Object.defineProperty(windowContext, 'fetch', { get: () => realFetch });
-        const { GoogleGenAI } = loadTransport(windowContext, true);
-        const ai = new GoogleGenAI({ apiKey: STUDIO_KEY_PLACEHOLDER });
+        const { GoogleGenAI } = loadTransport(windowContext, false);
+        const ai = new GoogleGenAI({ apiKey: STUDIO_KEY_PLACEHOLDER, httpOptions: { baseUrl: origin + '/api/gemini' } });
         const text = await ai.models.generateContent({ model: 'gemini-3.7-flash', contents: 'Translate hello', config: { temperature: 0.3 } });
         assert.equal(text.text, 'translated');
         assert.equal(calls[0].body.generationConfig.temperature, undefined);
@@ -185,8 +219,7 @@ test('real Google SDK uses the same HTTP server for text, SSE, images and embedd
         assert.deepEqual(embedding.embeddings[0].values, [0.1, 0.2]);
         const status = await realFetch(origin + '/api/gemini/status').then(r => r.json());
         assert.deepEqual(status, { transport: 'server', configured: true });
-        assert.equal(calls.length, 5);
-        assert.deepEqual(calls[0].body, calls[1].body);
+        assert.equal(calls.length, 4);
         assert.equal(globalThis.fetch, realFetch);
         assert.equal(windowContext.fetch, realFetch);
     } finally {
@@ -287,7 +320,7 @@ test('module loads and clients initialize when Window.fetch is getter-only and n
     Object.defineProperty(immutableWindow, 'fetch', { get: () => originalFetch, configurable: false });
     const transport = loadTransport(immutableWindow, true);
     const options = transport.getGeminiClientOptions({ apiKey: STUDIO_KEY_PLACEHOLDER });
-    assert.equal(options.httpOptions.baseUrl, 'https://preview.example/preview/app/api/gemini');
+    assert.equal(options.httpOptions.baseUrl, 'https://preview.example/preview/app/api/aistudio/gemini');
     assert.doesNotThrow(() => new transport.GoogleGenAI({ apiKey: STUDIO_KEY_PLACEHOLDER }));
     const ownOptions = { apiKey: 'user-key', httpOptions: { timeout: 5000 } };
     const routedOwnOptions = transport.getGeminiClientOptions(ownOptions);
@@ -299,30 +332,30 @@ test('module loads and clients initialize when Window.fetch is getter-only and n
     assert.equal(Object.getOwnPropertyDescriptor(immutableWindow, 'fetch').set, undefined);
 });
 
-test('AI Studio iframe presence cannot override the server-secret transport', async () => {
+test('AI Studio uses its own server route and never reads an injected browser key', async () => {
     const nativeWindow = {
         location: { origin: 'https://preview.example', href: 'https://preview.example/' },
         GEMINI_API_KEY: 'GEMINI_API_KEY',
         aistudio: { getHostUrl: async () => 'https://aistudio.google.com/apps/test' },
     };
-    Object.defineProperty(nativeWindow, 'fetch', { get: () => globalThis.fetch });
+    Object.defineProperty(nativeWindow, 'fetch', { get: () => async () => Response.json({ runtime: 'ai-studio', protocol: 2, configured: true }) });
     const transport = loadTransport(nativeWindow, true);
     const options = transport.getGeminiClientOptions({ apiKey: STUDIO_KEY_PLACEHOLDER });
-    assert.equal(options.apiKey, STUDIO_KEY_PLACEHOLDER);
-    assert.equal(options.httpOptions.baseUrl, 'https://preview.example/api/gemini');
+    assert.equal(options.apiKey, 'AI_STUDIO_SERVER_AUTH');
+    assert.equal(options.httpOptions.baseUrl, 'https://preview.example/api/aistudio/gemini');
     const calls = [];
     const bridgeFetch = transport.createGeminiFetch(async (url, init) => {
         calls.push({ url, init });
         return new Response('{}');
-    }, { nativeMode: () => true, origin: nativeWindow.location.origin, basePath: '/' });
+    }, { nativeMode: () => false, studioMode: () => true, origin: nativeWindow.location.origin, basePath: '/' });
     for (const key of ['', STUDIO_KEY_PLACEHOLDER, 'GEMINI_API_KEY']) {
         await bridgeFetch(api + 'gemini-3.1-flash-lite:generateContent' + (key ? '?key=' + key : ''), { method: 'POST', body: '{}' });
     }
     assert.equal(calls.length, 3);
     for (const call of calls) {
         assert.equal(call.url.origin, nativeWindow.location.origin);
-        assert.match(call.url.pathname, /^\/api\/gemini\//);
-        assert.equal(call.init.headers.has('x-goog-api-key'), false);
+        assert.match(call.url.pathname, /^\/api\/aistudio\/gemini\/v1beta\/models\//);
+        assert.equal(call.init.headers.get('x-goog-api-key'), 'AI_STUDIO_SERVER_AUTH');
         assert.equal(call.url.searchParams.has('key'), false);
     }
 });
@@ -355,7 +388,8 @@ test('Vertex Express SDK uses publisher paths and its own API key, including str
     try {
         await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
         const origin = `http://127.0.0.1:${server.address().port}`;
-        const transport = loadTransport({ location: { origin, href: origin + '/' }, localStorage: { getItem: key => (key === 'google_api_provider' ? 'vertex' : null) } }, true);
+        const transport = loadTransport({ location: { hostname: '127.0.0.1', origin, href: origin + '/' }, localStorage: { getItem: key => (key === 'google_api_provider' ? 'vertex' : null) } }, false);
+        assert.equal(new URL(transport.getGeminiClientOptions({ apiKey: 'vertex-test-key' }).httpOptions.baseUrl).origin, origin);
         const ai = new transport.GoogleGenAI({ apiKey: 'vertex-test-key' });
         assert.equal((await ai.models.generateContent({ model: 'gemini-3.1-flash-lite', contents: 'hello' })).text, 'vertex-ok');
         let text = '';

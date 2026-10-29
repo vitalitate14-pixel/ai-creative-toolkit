@@ -88,7 +88,8 @@ export async function fileToPngBlob(file: File, fallbackUrl?: string, reencode =
   // 3. 方案二：如果页面中已存在对应 <img> DOM 元素（直接从显存 Canvas 抓取，100% 成功率）
   if (fallbackUrl) {
     try {
-      const existingImg = document.querySelector(`img[src="${fallbackUrl}"]`) as HTMLImageElement | null;
+      const safeFallbackSelector = fallbackUrl.replace(/["\\]/g, '\\$&');
+      const existingImg = document.querySelector(`img[src="${safeFallbackSelector}"]`) as HTMLImageElement | null;
       if (existingImg && existingImg.complete && existingImg.naturalWidth > 0 && existingImg.naturalHeight > 0) {
         const canvas = document.createElement('canvas');
         canvas.width = existingImg.naturalWidth;
@@ -255,12 +256,15 @@ export async function copyImageAndPromptToClipboard(
     const pngBlob = await fileToPngBlob(file, fallbackUrl);
     const textBlob = new Blob([promptText], { type: 'text/plain' });
 
-    const directImgUrl = gyazoUrl ? normalizeGyazoDirectUrl(gyazoUrl) : '';
+    const rawDirectImgUrl = gyazoUrl ? normalizeGyazoDirectUrl(gyazoUrl) : '';
+    const directImgUrl = /^https?:\/\//i.test(rawDirectImgUrl)
+      ? rawDirectImgUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      : '';
     // 构建富文本 HTML
     const htmlSnippet = `
       <div style="font-family: sans-serif; line-height: 1.5;">
         ${directImgUrl ? `<img src="${directImgUrl}" alt="分镜图片" style="max-width: 320px; border-radius: 6px; display: block; margin-bottom: 8px;" />` : ''}
-        <p style="margin: 0; white-space: pre-wrap;">${promptText.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')}</p>
+        <p style="margin: 0; white-space: pre-wrap;">${promptText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')}</p>
       </div>
     `.trim();
     const htmlBlob = new Blob([htmlSnippet], { type: 'text/html' });

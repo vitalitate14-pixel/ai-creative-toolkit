@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Search, Book, Rocket, Monitor, Download, Keyboard, HelpCircle, Lightbulb, Sparkles, MousePointer, Palette } from 'lucide-react';
+import DOMPurify from 'dompurify';
 
 interface HelpPanelProps {
     isOpen: boolean;
@@ -314,7 +315,7 @@ export const HelpPanel: React.FC<HelpPanelProps> = ({ isOpen, onClose }) => {
 
 // 简单的 Markdown 转 HTML
 function simpleMarkdownToHtml(md: string): string {
-    return md
+    const html = md
         // 代码块
         .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
         // 行内代码
@@ -347,4 +348,5 @@ function simpleMarkdownToHtml(md: string): string {
         .replace(/(<tr>.*<\/tr>)+/gs, '<table>$&</table>')
         // 包装列表
         .replace(/(<li>.*<\/li>)+/gs, '<ul>$&</ul>');
+    return DOMPurify.sanitize(html, { ADD_ATTR: ['target', 'rel'] });
 }

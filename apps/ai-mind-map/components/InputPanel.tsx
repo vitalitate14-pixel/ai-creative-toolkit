@@ -1,3 +1,4 @@
+import { desktopEnvironmentKey } from '@/utils/apiKeyStorage';
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Download, Sparkles, Search, FileText, Clipboard, Image, Video, Globe, Music, Type } from 'lucide-react';
 import { useMindMapStore } from '../store/mindMapStore';
@@ -29,7 +30,7 @@ export const InputPanel: React.FC = () => {
         createFromStructure,
         addCreationRecord,
     } = useMindMapStore();
-    const envApiKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) as string | undefined;
+    const envApiKey = (typeof import.meta !== 'undefined' && desktopEnvironmentKey(import.meta.env?.VITE_GEMINI_API_KEY)) as string | undefined;
     const storedApiKey = getStoredApiKey();
     const apiKey = geminiApiKey || envApiKey || storedApiKey;
     const hasApiKey = hasAiAccess(apiKey);

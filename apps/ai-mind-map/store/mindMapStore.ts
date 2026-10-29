@@ -1,3 +1,4 @@
+import { desktopEnvironmentKey } from '@/utils/apiKeyStorage';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
@@ -348,7 +349,7 @@ export const useMindMapStore = create<MindMapState>()(
             layoutDirection: 'mindmap',
             contentMode: 'general',
             missingHints: [],
-            geminiApiKey: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) || '',
+            geminiApiKey: (typeof import.meta !== 'undefined' && desktopEnvironmentKey(import.meta.env?.VITE_GEMINI_API_KEY)) || '',
             aiMaxDepth: 3,
             aiDetailLevel: 'standard',
             aiExpandNodeId: null,

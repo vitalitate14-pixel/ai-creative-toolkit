@@ -5,7 +5,7 @@ const { Readable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 
 const API_PREFIX = '/api/gemini';
-const PLACEHOLDERS = new Set(['AISTUDIO_NATIVE_MODE_PLACEHOLDER', 'GEMINI_API_KEY']);
+const PLACEHOLDERS = new Set(['AISTUDIO_NATIVE_MODE_PLACEHOLDER', 'GEMINI_API_KEY', 'AI_STUDIO_SERVER_AUTH']);
 const usableKey = value => {
     const key = String(value || '').trim();
     return PLACEHOLDERS.has(key) ? '' : key;
@@ -19,20 +19,28 @@ function sendError(res, code, message) {
 }
 
 /** Forward only to Google; caller-supplied keys override the app owner's secret. */
-function createGeminiHandler({ getKey = () => process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '', upstreamFetch = fetch } = {}) {
+function createGeminiHandler({ getKey = () => process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '', upstreamFetch = fetch,
+    geminiPrefix = API_PREFIX, vertexPrefix = '/api/vertex', runtimeName, trustSameOriginProxy = false } = {}) {
     return async (req, res) => {
         const incoming = new URL(req.url, 'http://localhost');
-        const vertex = incoming.pathname.includes('/api/vertex/');
-        const prefix = vertex ? '/api/vertex' : API_PREFIX;
+        const vertex = incoming.pathname.includes(vertexPrefix + '/');
+        const prefix = vertex ? vertexPrefix : geminiPrefix;
         const prefixIndex = incoming.pathname.indexOf(prefix + '/');
         if (prefixIndex < 0) return false;
         res.setHeader('Cache-Control', 'no-store');
         res.setHeader('X-Content-Type-Options', 'nosniff');
         // Prevent other sites from consuming the app owner's secret via browsers.
         const origin = req.headers.origin;
-        const host = req.headers['x-forwarded-host'] || req.headers.host;
         let originAllowed = true;
-        try { if (origin) originAllowed = ['https:', 'http:'].includes(new URL(origin).protocol) && new URL(origin).host === req.headers.host; }
+        try {
+            if (origin) {
+                const parsed = new URL(origin);
+                const forwarded = req.headers['x-forwarded-host'];
+                const sameOriginProxy = trustSameOriginProxy && req.headers['sec-fetch-site'] === 'same-origin'
+                    && typeof forwarded === 'string' && !forwarded.includes(',') && parsed.host === forwarded;
+                originAllowed = ['https:', 'http:'].includes(parsed.protocol) && (parsed.host === req.headers.host || sameOriginProxy);
+            }
+        }
         catch { originAllowed = false; }
         if (req.headers['sec-fetch-site'] === 'cross-site' || !originAllowed) {
             sendError(res, 403, 'Cross-origin Gemini requests are not allowed.');
@@ -43,7 +51,7 @@ function createGeminiHandler({ getKey = () => process.env.GEMINI_API_KEY || proc
         const key = usableKey(callerKey) || usableKey(vertex ? process.env.VERTEX_API_KEY : getKey());
         if (apiPath === '/status' && req.method === 'GET') {
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ transport: 'server', configured: !!key }));
+            res.end(JSON.stringify({ transport: 'server', configured: !!key, ...(runtimeName ? { runtime: runtimeName, protocol: 2 } : {}) }));
             return true;
         }
         if (!['GET', 'POST', 'DELETE'].includes(req.method)

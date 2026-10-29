@@ -1,3 +1,4 @@
+import { apiKeyStorageKey, desktopEnvironmentKey } from '@/utils/apiKeyStorage';
 import React, { useState, useRef, useEffect, createContext, useContext, useCallback, useMemo } from 'react';
 import { Copy, Check, FileText, Globe, Languages, RefreshCw, Plus, FolderOpen, Pencil } from 'lucide-react';
 import { GoogleGenAI } from '../../utils/geminiTransport';
@@ -405,7 +406,7 @@ interface ApiProviderProps {
 }
 
 const ApiProvider: React.FC<ApiProviderProps> = ({ children, external }) => {
-    const [apiKey, _setApiKey] = useState(() => localStorage.getItem('user_api_key') || '');
+    const [apiKey, _setApiKey] = useState(() => localStorage.getItem(apiKeyStorageKey('user_api_key')) || '');
 
     const [isSettingsOpen, setSettingsOpen] = useState(false);
 
@@ -427,9 +428,9 @@ const ApiProvider: React.FC<ApiProviderProps> = ({ children, external }) => {
     const setApiKey = (key: string) => {
         _setApiKey(key);
         if (key) {
-            localStorage.setItem('user_api_key', key);
+            localStorage.setItem(apiKeyStorageKey('user_api_key'), key);
         } else {
-            localStorage.removeItem('user_api_key');
+            localStorage.removeItem(apiKeyStorageKey('user_api_key'));
         }
     };
 
@@ -439,7 +440,7 @@ const ApiProvider: React.FC<ApiProviderProps> = ({ children, external }) => {
             return (window as any).__app_get_ai_instance();
         }
 
-        const envKey = (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_GEMINI_API_KEY : '') || '';
+        const envKey = (typeof import.meta !== 'undefined' ? desktopEnvironmentKey((import.meta as any).env?.VITE_GEMINI_API_KEY) : '') || '';
         const keyToUse = apiKey || envKey;
         if (!keyToUse && !isRunningInAiStudio()) {
             throw new Error('API key is not set.');
@@ -463,7 +464,7 @@ const ApiProvider: React.FC<ApiProviderProps> = ({ children, external }) => {
     return new GoogleGenAI({ apiKey: cleanKey });
     };
 
-    const isKeySet = !!(apiKey || ((typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_GEMINI_API_KEY : '') || '') || isRunningInAiStudio());
+    const isKeySet = !!(apiKey || ((typeof import.meta !== 'undefined' ? desktopEnvironmentKey((import.meta as any).env?.VITE_GEMINI_API_KEY) : '') || '') || isRunningInAiStudio());
 
     return (
         <ApiContext.Provider value={{ apiKey, setApiKey, getAiInstance, isKeySet, isSettingsOpen, setSettingsOpen, allowApiKeySettings }}>
@@ -1741,7 +1742,7 @@ const TranslateTool = ({
     const CONCURRENCY_KEY = 'smart_translate_concurrency';
     const GOOGLE_MODEL_KEY = 'smart_translate_google_model';
     const GROQ_MODEL_KEY = 'smart_translate_groq_model';
-    const GROQ_KEYS_KEY = 'smart_translate_groq_keys';
+    const GROQ_KEYS_KEY = apiKeyStorageKey('smart_translate_groq_keys');
 
     const [concurrency, setConcurrency] = useState(() => {
         try { const v = localStorage.getItem(CONCURRENCY_KEY); return v ? Math.max(1, Math.min(MAX_CONCURRENCY, parseInt(v))) : DEFAULT_CONCURRENCY; } catch { return DEFAULT_CONCURRENCY; }

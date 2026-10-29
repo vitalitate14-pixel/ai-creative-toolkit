@@ -101,5 +101,7 @@ export const shouldUseAiStudioMode = (apiKey?: string): boolean => {
  * 是否运行在 AI Studio 环境中（不依赖 key）
  */
 export const isRunningInAiStudio = (): boolean => {
+    // Electron 必须使用桌面凭据，即使误装了带 AI Studio 构建标记的资源。
+    if (typeof window !== 'undefined' && (window as any).electronAPI) return false;
     return isEnvAiStudio() || isHostAiStudio();
 };

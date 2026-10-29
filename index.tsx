@@ -1,3 +1,4 @@
+import { apiKeyStorageKey, desktopEnvironmentKey } from '@/utils/apiKeyStorage';
 import { LOCAL_PROFILE } from './services/localFirestore';
 
 // 版本号全局变量声明
@@ -804,7 +805,7 @@ const FORCE_RELOAD_VERSION = '2026-04-10-v1';
   if (lastVersion !== FORCE_RELOAD_VERSION) {
     localStorage.setItem('app_force_reload_version', FORCE_RELOAD_VERSION);
     // 清除旧的 API 池设置
-    localStorage.removeItem('use_api_pool');
+    localStorage.removeItem(apiKeyStorageKey('use_api_pool'));
     localStorage.removeItem('use_shared_api_pool');
     if (lastVersion) {
       // 只有之前有旧版本的用户才刷新，首次访问不刷新
@@ -814,15 +815,15 @@ const FORCE_RELOAD_VERSION = '2026-04-10-v1';
 })();
 
 const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [manualApiKey, _setManualApiKey] = useState(() => localStorage.getItem('user_api_key') || '');
+  const [manualApiKey, _setManualApiKey] = useState(() => localStorage.getItem(apiKeyStorageKey('user_api_key')) || '');
   // 恢复 API 池的持久化存储，记住用户的选择
   const [usePool, setUsePool] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return localStorage.getItem('use_api_pool') === 'true';
+    return localStorage.getItem(apiKeyStorageKey('use_api_pool')) === 'true';
   });
 
   const [poolConfig, _setPoolConfig] = useState<{ sheetId: string; sheetName?: string; userName: string } | null>(() => {
-    const stored = localStorage.getItem('api_pool_config');
+    const stored = localStorage.getItem(apiKeyStorageKey('api_pool_config'));
     return stored ? JSON.parse(stored) : null;
   });
   const [apiPool, setApiPool] = useState<import('./services/apiPoolService').ApiKeyPool | null>(null);
@@ -831,18 +832,18 @@ const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const setManualApiKey = (key: string) => {
     _setManualApiKey(key);
     if (key) {
-      localStorage.setItem('user_api_key', key);
+      localStorage.setItem(apiKeyStorageKey('user_api_key'), key);
     } else {
-      localStorage.removeItem('user_api_key');
+      localStorage.removeItem(apiKeyStorageKey('user_api_key'));
     }
   };
 
   const setPoolConfig = (config: { sheetId: string; sheetName?: string; userName: string } | null) => {
     _setPoolConfig(config);
     if (config) {
-      localStorage.setItem('api_pool_config', JSON.stringify(config));
+      localStorage.setItem(apiKeyStorageKey('api_pool_config'), JSON.stringify(config));
     } else {
-      localStorage.removeItem('api_pool_config');
+      localStorage.removeItem(apiKeyStorageKey('api_pool_config'));
     }
   };
 
@@ -926,7 +927,7 @@ const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const getAppEnvApiKey = (): string => {
     try {
-      const viteKey = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GEMINI_API_KEY) as string | undefined;
+      const viteKey = (typeof import.meta !== 'undefined' && desktopEnvironmentKey((import.meta as any).env?.VITE_GEMINI_API_KEY)) as string | undefined;
       if (viteKey) return viteKey;
     } catch { /* ignore */ }
     try {
@@ -936,7 +937,7 @@ const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       if (typeof process !== 'undefined' && (process as any).env?.GEMINI_API_KEY) return (process as any).env.GEMINI_API_KEY;
     } catch { /* ignore */ }
     try {
-      const viteGoogle = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GOOGLE_API_KEY) as string | undefined;
+      const viteGoogle = (typeof import.meta !== 'undefined' && desktopEnvironmentKey((import.meta as any).env?.VITE_GOOGLE_API_KEY)) as string | undefined;
       if (viteGoogle) return viteGoogle;
     } catch { /* ignore */ }
     return '';
@@ -951,7 +952,7 @@ const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         console.error('[ApiProvider] 从API池获取密钥失败:', error);
       }
     }
-    return manualApiKey || getAppEnvApiKey() || '';
+    return manualApiKey || (isRunningInAiStudio() ? '' : getAppEnvApiKey()) || '';
   };
 
   // 检测是否为 AI Studio 模式
@@ -965,7 +966,7 @@ const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const rawKey = getCurrentApiKey();
     const keyToUse = rawKey.trim().replace(/[^\x20-\x7E]/g, '');
 
-    // AI Studio 版统一访问应用服务端，由运行时注入的 GEMINI_API_KEY 认证。
+    // AI Studio 使用独立的平台认证入口，不读取桌面版的环境 Key。
     if (isRunningInAiStudio()) {
       const studioKey = keyToUse || 'AISTUDIO_NATIVE_MODE_PLACEHOLDER';
       return wrapWithGroqProxy(new GoogleGenAI({ apiKey: studioKey }), studioKey);
@@ -1284,7 +1285,7 @@ const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Groq 模型 + Groq Key 也算 "有key"
   const hasGroqKeys = (() => {
     try {
-      return ['smart_translate_groq_keys', 'groqKeys'].some((storageKey) => {
+      return [apiKeyStorageKey('smart_translate_groq_keys'), apiKeyStorageKey('groqKeys')].some((storageKey) => {
         const raw = localStorage.getItem(storageKey);
         if (!raw) return false;
         const keys = JSON.parse(raw);
@@ -1297,7 +1298,7 @@ const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   // 恢复 API 池的同步与持久化
   useEffect(() => {
-    localStorage.setItem('use_api_pool', usePool ? 'true' : 'false');
+    localStorage.setItem(apiKeyStorageKey('use_api_pool'), usePool ? 'true' : 'false');
   }, [usePool]);
 
 
@@ -5950,8 +5951,8 @@ const ApiKeyModal: React.FC<{
   const [activeTab, setActiveTab] = useState<'manual' | 'pool' | 'groq'>(usePool ? 'pool' : 'manual');
   const [localKey, setLocalKey] = useState(apiKey);
   const [localProvider, setLocalProvider] = useState(getGoogleApiProvider);
-  const [vertexProject, setVertexProject] = useState(() => localStorage.getItem('vertex_project') || '');
-  const [vertexLocation, setVertexLocation] = useState(() => localStorage.getItem('vertex_location') || 'global');
+  const [vertexProject, setVertexProject] = useState(() => localStorage.getItem(apiKeyStorageKey('vertex_project')) || '');
+  const [vertexLocation, setVertexLocation] = useState(() => localStorage.getItem(apiKeyStorageKey('vertex_location')) || 'global');
   const [showUsageStats, setShowUsageStats] = useState(false);
   const [, setRenderBump] = useState(0);
 
@@ -5990,8 +5991,8 @@ const ApiKeyModal: React.FC<{
     // 表格同步状态
 
   // ─── Groq Key 管理 ───────────────────────────────────────────
-  const GROQ_KEYS_KEY = 'smart_translate_groq_keys';
-  const LEGACY_GROQ_KEYS_KEY = 'groqKeys';
+  const GROQ_KEYS_KEY = apiKeyStorageKey('smart_translate_groq_keys');
+  const LEGACY_GROQ_KEYS_KEY = apiKeyStorageKey('groqKeys');
   const [groqKeysLocal, setGroqKeysLocal] = useState<string[]>(() => {
     try {
       const merged = new Set<string>();
@@ -6093,14 +6094,14 @@ const ApiKeyModal: React.FC<{
 
 
   const handleSaveManual = () => {
-    localStorage.setItem('google_api_provider', localProvider);
+    localStorage.setItem(apiKeyStorageKey('google_api_provider'), localProvider);
     const project = vertexProject.trim();
     if (project && !/^[a-z0-9][a-z0-9-]{0,62}$/i.test(project)) {
       alert('Vertex 项目 ID / 编号格式不正确（只能包含字母、数字和短横线）');
       return;
     }
-    if (project) localStorage.setItem('vertex_project', project); else localStorage.removeItem('vertex_project');
-    localStorage.setItem('vertex_location', (vertexLocation.trim() || 'global').toLowerCase());
+    if (project) localStorage.setItem(apiKeyStorageKey('vertex_project'), project); else localStorage.removeItem(apiKeyStorageKey('vertex_project'));
+    localStorage.setItem(apiKeyStorageKey('vertex_location'), (vertexLocation.trim() || 'global').toLowerCase());
     setApiKey(localKey);
     setUsePool(false);
     onClose();
@@ -6661,7 +6662,7 @@ const ApiKeyModal: React.FC<{
                     setUsePool(e.target.checked);
                     if (!e.target.checked) {
                       // 关闭时清除配置
-                      localStorage.removeItem('use_api_pool');
+                      localStorage.removeItem(apiKeyStorageKey('use_api_pool'));
                     }
                   }}
                   style={{ opacity: 0, width: 0, height: 0 }}
@@ -7344,8 +7345,8 @@ const ApiKeyModal: React.FC<{
                       // 这里得手动调用旧有逻辑的保存持久化和事件派发
                       try {
                         const serialized = JSON.stringify(newKeys);
-                        localStorage.setItem('smart_translate_groq_keys', serialized);
-                        localStorage.setItem('groqKeys', serialized);
+                        localStorage.setItem(apiKeyStorageKey('smart_translate_groq_keys'), serialized);
+                        localStorage.setItem(apiKeyStorageKey('groqKeys'), serialized);
                       } catch { /* ignore */ }
                       window.dispatchEvent(new CustomEvent('groqKeysChanged', { detail: newKeys }));
 

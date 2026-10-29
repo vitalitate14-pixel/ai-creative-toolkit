@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Search, X } from 'lucide-react';
+import DOMPurify from 'dompurify';
 
 interface HelpCenterProps {
     isOpen: boolean;
@@ -642,14 +643,14 @@ export const HelpCenter: React.FC<HelpCenterProps> = ({ isOpen, onClose, languag
 
 // 简单的 Markdown 转 HTML
 function simpleMarkdownToHtml(md: string): string {
-    return md
+    const html = md
         .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         .replace(/^### (.+)$/gm, '<h3>$1</h3>')
         .replace(/^## (.+)$/gm, '<h2>$1</h2>')
         .replace(/^# (.+)$/gm, '<h1>$1</h1>')
         .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
         .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
         .replace(/\|(.+)\|/g, (match) => {
             const cells = match.split('|').filter(c => c.trim());
@@ -663,6 +664,7 @@ function simpleMarkdownToHtml(md: string): string {
         .replace(/\n/g, '<br>')
         .replace(/(<tr>.*<\/tr>)+/gs, '<table>$&</table>')
         .replace(/(<li>.*<\/li>)+/gs, '<ul>$&</ul>');
+    return DOMPurify.sanitize(html, { ADD_ATTR: ['target', 'rel'] });
 }
 
 export default HelpCenter;

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "node dev-runner.cjs",
     "build": "node build-runner.cjs",
+    "build:desktop": "node build-runner.cjs desktop",
+    "build:aistudio": "node build-runner.cjs aistudio",
     "package:aistudio": "node scripts/package-aistudio.cjs",
     "start": "node dev-runner.cjs",
     "preview": "vite preview",

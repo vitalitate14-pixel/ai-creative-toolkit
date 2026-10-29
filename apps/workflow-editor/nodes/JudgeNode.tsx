@@ -118,14 +118,16 @@ const JudgeNode: React.FC<NodeProps> = ({ data }) => {
           }
 
           // 2. 从 A 中提取用户指定的维度值，替换到 B 中
+          const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           result = B;
           for (const rule of replaceRules) {
             if (!rule.keyword.trim()) continue;
             const kw = rule.keyword.trim();
+            const escapedKw = escapeRegExp(kw);
             // 从 A 中提取：支持 "【库名】值" "库名: 值" "库名=值" 格式
             const patterns = [
-              new RegExp(`(?:【${kw}】|\\[${kw}\\])\\s*[:：=]?\\s*(.+?)(?:\\n|$)`, 'i'),
-              new RegExp(`${kw}\\s*[:：=]\\s*(.+?)(?:\\n|$)`, 'i'),
+              new RegExp(`(?:【${escapedKw}】|\\[${escapedKw}\\])\\s*[:：=]?\\s*(.+?)(?:\\n|$)`, 'i'),
+              new RegExp(`${escapedKw}\\s*[:：=]\\s*(.+?)(?:\\n|$)`, 'i'),
             ];
             let userValue = '';
             for (const pat of patterns) {
@@ -139,8 +141,8 @@ const JudgeNode: React.FC<NodeProps> = ({ data }) => {
 
             // 在 B 中替换同名维度
             const replacePatterns = [
-              new RegExp(`((?:【${kw}】|\\[${kw}\\])\\s*[:：=]?\\s*)([^\\n]*)`, rule.replaceAll ? 'gi' : 'i'),
-              new RegExp(`(${kw}\\s*[:：=]\\s*)([^\\n]*)`, rule.replaceAll ? 'gi' : 'i'),
+              new RegExp(`((?:【${escapedKw}】|\\[${escapedKw}\\])\\s*[:：=]?\\s*)([^\\n]*)`, rule.replaceAll ? 'gi' : 'i'),
+              new RegExp(`(${escapedKw}\\s*[:：=]\\s*)([^\\n]*)`, rule.replaceAll ? 'gi' : 'i'),
             ];
             for (const rp of replacePatterns) {
               if (rp.test(result)) {
@@ -154,7 +156,8 @@ const JudgeNode: React.FC<NodeProps> = ({ data }) => {
           if (appendKeywords.trim()) {
             const appendKws = appendKeywords.split(/[,，、\s]+/).filter(Boolean);
             for (const ak of appendKws) {
-              const akPat = new RegExp(`(?:【?${ak}】?)\\s*[:：=]?\\s*(.+?)(?:\\n|$)`, 'i');
+              const escapedAk = escapeRegExp(ak);
+              const akPat = new RegExp(`(?:【?${escapedAk}】?)\\s*[:：=]?\\s*(.+?)(?:\\n|$)`, 'i');
               const m = A.match(akPat);
               if (m && m[1]?.trim()) {
                 result = result.trimEnd() + '\n' + m[1].trim();

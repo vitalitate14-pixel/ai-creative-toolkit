@@ -1,3 +1,4 @@
+import { desktopEnvironmentKey } from '@/utils/apiKeyStorage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ReactFlow,
@@ -1597,7 +1598,7 @@ export const MindMapCanvas: React.FC = () => {
         const node = currentMap.nodes[aiExpandNodeId];
         if (!node) return;
 
-        const envApiKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) as string | undefined;
+        const envApiKey = (typeof import.meta !== 'undefined' && desktopEnvironmentKey(import.meta.env?.VITE_GEMINI_API_KEY)) as string | undefined;
         const storedApiKey = getStoredApiKey();
         const key = geminiApiKey || envApiKey || storedApiKey;
         if (!hasAiAccess(key)) {
@@ -1629,7 +1630,7 @@ export const MindMapCanvas: React.FC = () => {
         const node = currentMap.nodes[nodeId];
         if (!node) return;
 
-        const envApiKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) as string | undefined;
+        const envApiKey = (typeof import.meta !== 'undefined' && desktopEnvironmentKey(import.meta.env?.VITE_GEMINI_API_KEY)) as string | undefined;
         const storedApiKey = getStoredApiKey();
         const key = geminiApiKey || envApiKey || storedApiKey;
         if (!hasAiAccess(key)) {

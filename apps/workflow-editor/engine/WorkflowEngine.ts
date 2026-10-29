@@ -426,13 +426,15 @@ export async function runWorkflow(
                 if (globalKeyword && a.includes(globalKeyword)) {
                   return a;
                 } else {
+                  const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                   let result = b;
                   for (const rule of replaceRules) {
                     const kw = (rule.keyword || '').trim();
                     if (!kw) continue;
+                    const escapedKw = escapeRegExp(kw);
                     const patterns = [
-                      new RegExp(`(?:【${kw}】|\\[${kw}\\])\\s*[:：=]?\\s*(.+?)(?:\\n|$)`, 'i'),
-                      new RegExp(`${kw}\\s*[:：=]\\s*(.+?)(?:\\n|$)`, 'i'),
+                      new RegExp(`(?:【${escapedKw}】|\\[${escapedKw}\\])\\s*[:：=]?\\s*(.+?)(?:\\n|$)`, 'i'),
+                      new RegExp(`${escapedKw}\\s*[:：=]\\s*(.+?)(?:\\n|$)`, 'i'),
                     ];
                     let userValue = '';
                     for (const pat of patterns) {
@@ -441,7 +443,7 @@ export async function runWorkflow(
                     }
                     if (!userValue) continue;
                     const rp = new RegExp(
-                      `((?:【${kw}】|\\[${kw}\\]|${kw})\\s*[:：=]?\\s*)([^\\n]*)`,
+                      `((?:【${escapedKw}】|\\[${escapedKw}\\]|${escapedKw})\\s*[:：=]?\\s*)([^\\n]*)`,
                       rule.replaceAll ? 'gi' : 'i'
                     );
                     if (rp.test(result)) {
@@ -449,7 +451,8 @@ export async function runWorkflow(
                     }
                   }
                   for (const ak of appendKws) {
-                    const akPat = new RegExp(`(?:【?${ak}】?)\\s*[:：=]?\\s*(.+?)(?:\\n|$)`, 'i');
+                    const escapedAk = escapeRegExp(ak);
+                    const akPat = new RegExp(`(?:【?${escapedAk}】?)\\s*[:：=]?\\s*(.+?)(?:\\n|$)`, 'i');
                     const m = a.match(akPat);
                     if (m && m[1]?.trim()) {
                       result = result.trimEnd() + '\n' + m[1].trim();

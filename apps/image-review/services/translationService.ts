@@ -1,3 +1,4 @@
+import { apiKeyStorageKey } from '@/utils/apiKeyStorage';
 /**
  * 翻译服务 - 中英文翻译与回译验证
  * 支持语气级别选择（温和、协作式的表达）
@@ -214,7 +215,7 @@ export const getTranslationTargetConfig = (targetLanguage: TranslationTargetLang
 // 获取 API Key（使用整个软件统一的 user_api_key）
 const getApiKey = (): string => {
     if (typeof window !== 'undefined') {
-        return localStorage.getItem('user_api_key') || '';
+        return localStorage.getItem(apiKeyStorageKey('user_api_key')) || '';
     }
     return '';
 };

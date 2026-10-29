@@ -1,3 +1,4 @@
+import { apiKeyStorageKey } from '@/utils/apiKeyStorage';
 import { getGoogleSheetsApiKey } from '../../utils/publicApiConfig';
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Search, Upload, Sparkles, ExternalLink, Loader2, Tag, X, RotateCcw, Copy, Check, FolderOpen, ChevronRight, Grid3X3, List, BookOpen, Link2, RefreshCw, Zap, Sun, Moon, Leaf, Download, FileUp } from 'lucide-react';
@@ -877,8 +878,8 @@ ${tutorialList}
 
     // 检测用户是否手动配置了 API Key（不算内置的 process.env）
     const hasApiKey = useMemo(() => {
-        const manualKey = localStorage.getItem('user_api_key') || '';
-        const usePool = localStorage.getItem('use_api_pool') === 'true';
+        const manualKey = localStorage.getItem(apiKeyStorageKey('user_api_key')) || '';
+        const usePool = localStorage.getItem(apiKeyStorageKey('use_api_pool')) === 'true';
         return !!manualKey.trim() || usePool;
     }, []);
 

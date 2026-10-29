@@ -1,3 +1,4 @@
+import { apiKeyStorageKey, desktopEnvironmentKey } from '@/utils/apiKeyStorage';
 /**
  * AI 汇总服务 - 使用 Gemini 自动生成问题汇总
  */
@@ -13,8 +14,8 @@ const getAiInstance = () => {
     }
 
     // 回退：自行创建实例
-    const storedKey = typeof window !== 'undefined' ? localStorage.getItem('user_api_key') : null;
-    const rawKey = storedKey || (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_GEMINI_API_KEY : '') || '';
+    const storedKey = typeof window !== 'undefined' ? localStorage.getItem(apiKeyStorageKey('user_api_key')) : null;
+    const rawKey = storedKey || (typeof import.meta !== 'undefined' ? desktopEnvironmentKey((import.meta as any).env?.VITE_GEMINI_API_KEY) : '') || '';
     const cleanKey = rawKey.trim().replace(/[^\x20-\x7E]/g, '');
 
     // AI Studio 环境：平台内部处理认证

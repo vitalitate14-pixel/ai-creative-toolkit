@@ -1,12 +1,14 @@
 const electron = require('electron');
-console.log('[DEBUG] electron module:', typeof electron, electron);
-console.log('[DEBUG] app:', typeof electron.app, electron.app);
 
 const { app, BrowserWindow, ipcMain, session, shell, Menu, nativeImage, clipboard, dialog } = electron;
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { externalHttpUrl, cacheFilePath, trustedAppUrl, trustedIpcSender, appOrigin } = require('./security.cjs');
+const safeFetchModulePath = fs.existsSync(path.join(__dirname, '..', 'runtime', 'safe-fetch.cjs'))
+    ? path.join(__dirname, '..', 'runtime', 'safe-fetch.cjs')
+    : path.join(process.resourcesPath, 'runtime', 'safe-fetch.cjs');
+const { safePublicFetch, isSameOriginRequest } = require(safeFetchModulePath);
 
 // 缓存目录 - 延迟初始化（在 app ready 后）
 let userDataPath;
@@ -227,7 +229,6 @@ function createWindow() {
         // Share the same Google API routes as local development and AI Studio.
         const { createGeminiHandler } = require(path.join(process.resourcesPath, 'runtime', 'aistudio-server.cjs'));
         const handleGoogleApi = createGeminiHandler();
-        const { safePublicFetch, isSameOriginRequest } = require(path.join(process.resourcesPath, 'runtime', 'safe-fetch.cjs'));
         // 创建简单的静态文件服务器
         const server = http.createServer(async (req, res) => {
             // Reject DNS rebinding against the loopback desktop server.
@@ -436,10 +437,20 @@ const handleAppIpc = (channel, handler) => ipcMain.handle(channel, (event, ...ar
 handleAppIpc('split-project:save-file', async (_event, { json, filename, imagePaths }) => {
     try {
         const folders = [...new Set((imagePaths || []).filter(p => typeof p === 'string' && path.isAbsolute(p)).map(p => path.dirname(p)))];
-        const suggestedDirectory = folders.length === 1 ? folders[0] : app.getPath('documents');
-        const safeName = path.basename(filename || '拆分工程.aitkproj.json');
-        const suffix = safeName.endsWith('.aitkproj.json') ? '.aitkproj.json' : path.extname(safeName);
-        const stem = safeName.slice(0, safeName.length - suffix.length);
+        let suggestedDirectory = app.getPath('documents');
+        if (folders.length === 1) {
+            try {
+                const dirStat = await fs.promises.stat(folders[0]);
+                if (dirStat.isDirectory()) suggestedDirectory = folders[0];
+            } catch {}
+        }
+        const rawBase = path.basename(String(filename || '拆分工程.aitkproj.json')).replace(/[\u0000-\u001f\u007f]/g, '').replace(/^\.+/, '');
+        const suffix = '.aitkproj.json';
+        const rawStem = rawBase.endsWith(suffix)
+            ? rawBase.slice(0, -suffix.length)
+            : rawBase.replace(/\.json$/i, '');
+        const stem = (rawStem || '拆分工程').trim() || '拆分工程';
+        const safeName = `${stem}${suffix}`;
         let index = 1;
         for (;;) {
             const destination = path.join(suggestedDirectory, index === 1 ? safeName : `${stem} (${index})${suffix}`);
@@ -496,11 +507,29 @@ handleAppIpc('image-prompt-sheet:ready' , () => {
     return imagePromptSheetData;
 });
 // 原图必须在本地存在；找不到时提示重新关联，不使用内存副本兜底。
+const ALLOWED_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.svg', '.avif', '.ico', '.tif', '.tiff']);
 async function assertLocalImageFile(filePath) {
     if (typeof filePath !== 'string' || !path.isAbsolute(filePath)) throw new Error('原图片路径无效，请查找素材重新关联');
+    const ext = path.extname(filePath).toLowerCase();
+    if (!ALLOWED_IMAGE_EXTENSIONS.has(ext)) throw new Error('仅支持复制本地图片文件');
     let stat;
     try { stat = await fs.promises.stat(filePath); } catch { stat = null; }
     if (!stat || !stat.isFile()) throw new Error(`本地找不到原图片：${path.basename(filePath)}，请查找素材重新关联`);
+}
+
+async function fetchClipboardImage(url) {
+    if (typeof url !== 'string' || !url) throw new Error('图片地址无效');
+    if (/^data:image\/[a-z0-9.+-]+;base64,/i.test(url)) {
+        return fetch(url);
+    }
+    if (trustedAppUrl(url, process.env.NODE_ENV === 'development')) {
+        return fetch(url);
+    }
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error('不支持的图片协议');
+    }
+    return safePublicFetch(parsed.toString(), { redirect: 'follow' });
 }
 
 async function writeClipboardFilePaths(paths) {
@@ -548,7 +577,7 @@ handleAppIpc('image-prompt-sheet:copy-image', async (_event, url, originalName, 
             await writeClipboardFilePaths([originalPath]);
             return { success: true, source: 'original-file' };
         }
-        const response = await fetch(url);
+        const response = await fetchClipboardImage(url);
         if (!response.ok) throw new Error(`图片读取失败 (${response.status})`);
         const bytes = Buffer.from(await response.arrayBuffer());
         const image = nativeImage.createFromBuffer(bytes);
@@ -589,7 +618,7 @@ handleAppIpc('image-prompt-sheet:copy-images', async (_event, images) => {
             }
             const name = path.basename(String(item.name || '').replace(/\\/g, '/'));
             if (!name || name === '.' || name === '..') throw new Error('图片文件名无效');
-            const response = await fetch(item.url);
+            const response = await fetchClipboardImage(item.url);
             if (!response.ok) throw new Error(`读取图片失败：${name}`);
             const bytes = Buffer.from(await response.arrayBuffer());
             if (nativeImage.createFromBuffer(bytes).isEmpty()) throw new Error(`图片格式无效：${name}`);

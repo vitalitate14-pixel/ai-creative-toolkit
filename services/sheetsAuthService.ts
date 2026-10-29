@@ -122,6 +122,11 @@ export function buildApiKeyUrl(baseUrl: string): string {
 
 // ==================== Service Account 模式 ====================
 
+const ALLOWED_GOOGLE_TOKEN_URIS = new Set([
+    'https://oauth2.googleapis.com/token',
+    'https://accounts.google.com/o/oauth2/token',
+]);
+
 /**
  * 验证 Service Account 密钥格式
  */
@@ -132,7 +137,8 @@ export function validateServiceAccountCredentials(creds: unknown): creds is Serv
         c.type === 'service_account' &&
         typeof c.private_key === 'string' &&
         typeof c.client_email === 'string' &&
-        typeof c.token_uri === 'string'
+        typeof c.token_uri === 'string' &&
+        ALLOWED_GOOGLE_TOKEN_URIS.has(c.token_uri)
     );
 }
 
@@ -143,6 +149,10 @@ export function validateServiceAccountCredentials(creds: unknown): creds is Serv
 export async function getServiceAccountToken(
     credentials: ServiceAccountCredentials
 ): Promise<{ token: string; expiresAt: number }> {
+    if (!ALLOWED_GOOGLE_TOKEN_URIS.has(credentials.token_uri)) {
+        throw new Error('不安全的 Service Account token_uri，仅允许 Google 官方 OAuth 令牌端点');
+    }
+
     // JWT Header
     const header = {
         alg: 'RS256',
