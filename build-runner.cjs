@@ -97,7 +97,7 @@ if (isCloud) {
       const studio = edition === 'aistudio';
       const outDir = studio ? 'prebuilt-dist' : 'dist';
       console.log(`Building ${edition} into ${outDir}...`);
-      cp.execFileSync('npx', ['vite', 'build', '--outDir', outDir], {
+      cp.execFileSync(process.execPath, [path.join(__dirname, 'node_modules/vite/bin/vite.js'), 'build', '--outDir', outDir], {
         cwd: __dirname,
         stdio: 'inherit',
         env: { ...process.env, LOCAL_DEV: 'true', VITE_AI_STUDIO: studio ? 'true' : 'false',

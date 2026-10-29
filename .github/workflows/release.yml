@@ -1,6 +1,7 @@
 name: Release Electron App
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v*'
@@ -8,8 +9,21 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: windows-latest
+            platform: win
+            arch: x64
+          - os: macos-latest
+            platform: mac
+            arch: arm64
+          - os: macos-latest
+            platform: mac
+            arch: x64
     runs-on: ${{ matrix.os }}
 
     # Build runs third-party install scripts; it only needs to read the repo and
@@ -33,24 +47,18 @@ jobs:
         run: npm ci
 
       - name: Build Frontend
-        run: npm run build
+        run: npm run build:desktop
         env:
           LOCAL_DEV: 'true'
 
       - name: Install Electron Dependencies
         run: cd electron && npm ci
 
-      - name: Build Electron App (macOS)
-        if: matrix.os == 'macos-latest'
-        run: cd electron && npx electron-builder --mac --publish never
-
-      - name: Build Electron App (Windows)
-        if: matrix.os == 'windows-latest'
-        run: cd electron && npx electron-builder --win --publish never
-
-      - name: Build Electron App (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: cd electron && npx electron-builder --linux --publish never
+      - name: Build Electron App
+        working-directory: electron
+        run: npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Attest Build Provenance
         uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
@@ -65,7 +73,8 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: electron-${{ matrix.os }}
+          name: electron-${{ matrix.platform }}-${{ matrix.arch }}
+          if-no-files-found: error
           path: |
             dist-electron/*.exe
             dist-electron/*.dmg
@@ -73,6 +82,7 @@ jobs:
             dist-electron/*.zip
 
   release:
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
     permissions:

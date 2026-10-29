@@ -6,7 +6,7 @@
     "author": "ITEN Creative Toolkit",
     "repository": {
         "type": "git",
-        "url": "https://github.com/secure-artifacts/ai-tool.git"
+            "url": "https://github.com/vitalitate14-pixel/ai-creative-toolkit.git"
     },
     "scripts": {
         "start": "electron .",
@@ -54,8 +54,12 @@
             ]
         },
         "nsis": {
+            "artifactName": "ai-creative-toolkit-${version}-win-${arch}-setup.${ext}",
             "oneClick": false,
             "allowToChangeInstallationDirectory": true
+        },
+        "portable": {
+            "artifactName": "ai-creative-toolkit-${version}-win-${arch}-portable.${ext}"
         }
     },
     "devDependencies": {
